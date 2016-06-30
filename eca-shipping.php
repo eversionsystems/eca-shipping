@@ -3,7 +3,7 @@
 Plugin Name: ECA Shipping Method
 Plugin URI: http://eversionsystems.com
 Description: Custom shipping based on cart total
-Version: 1.0
+Version: 1.1
 Author: Andrew Schultz
 Author URI: http://eversionsystems.com
 License: GPL2
@@ -102,6 +102,12 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 							'description'   	=> __( 'Add Express shipping charges here') 
 					);
 					
+					//Add a checkbox to enable/disable shipping
+					$settings[ 'australian_express_shipping_enabled'] = array(
+						'title'       => __( 'Express Enabled', 'woocommerce' ),
+						'type'        => 'checkbox'
+					);
+					
 					for ($x = 1; $x <= $this->shipping_fields_num; $x++) {
 						$settings[ 'australian_express_shipping_cost_' . $x ] = array(
 							'title'       => sprintf( __( 'Shipping Cost %s', 'wc_eca_shipping' ), $x ),
@@ -157,7 +163,7 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 					//Simplify postage cost to just the entire cart contents total
 					//$total_cost = $woocommerce->cart->subtotal;
 					
-					//Loop over Australian shipping costs in form "lower|upper|cost"
+					//Loop over shipping costs in form "lower|upper|cost"
 					for ($x = 1; $x <= $this->shipping_fields_num; $x++) {
 						if(in_array($billing_country_code, $local_country_codes))
 							$shipping_cost_string = $this->get_option( 'australian_shipping_cost_' . $x );
@@ -169,7 +175,6 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 						$upper = $shipping_params_array[1];
 						$shipping_cost = $shipping_params_array[2];
 						
-						//Round price to whole number
 						//$total_cost = round($total_cost);
 						
 						if($total_cost >= $lower && $total_cost <= $upper) {
@@ -204,18 +209,26 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 						}
 					}
 					
-					if(in_array($billing_country_code, $local_country_codes)) {
-						$rate_express = array(
-							'id' => 'eca_shipping_express',
-							'label' => 'Express',
-							'cost' => $shipping_cost,
-							'calc_tax' => 'per_item'
-						);
+					//Remove express shipping if unchecked in the configuration options
+					$enable_express = $this->get_option('australian_express_shipping_enabled');
+					
+					if($enable_express == 'yes') {
+						if(in_array($billing_country_code, $local_country_codes)) {
+							$rate_express = array(
+								'id' => 'eca_shipping_express',
+								'label' => 'Express',
+								'cost' => $shipping_cost,
+								'calc_tax' => 'per_item'
+							);
 
-						$this->add_rate( $rate_express ); // Register the express rate
+							$this->add_rate( $rate_express ); // Register the express rate
+						}
+						else
+							unset($rates['eca_shipping_express'] );
 					}
-					else
+					else {
 						unset($rates['eca_shipping_express'] );
+					}
 				}
 				
 				/**
@@ -226,6 +239,7 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 				public function get_package_item_total_cost( $package ) {
 					$total_cost = 0;
 					foreach ( $package['contents'] as $item_id => $values ) {
+						//write_log($values['data']);
 						if ( $values['quantity'] > 0 && $values['data']->needs_shipping() ) {
 							$total_cost += $values['data']->get_price() * $values['quantity'];
 						}
@@ -248,7 +262,7 @@ if ( in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', g
 	function myplugin_admin_messages() {
 		add_settings_error( 'wc_eca_shipping', 'wc_eca_shipping_shipping_rate_updated_fail', __('There was a problem updating your shipping rate, please try again.', 'wc_eca_shipping'), 'error' );
 		settings_errors( 'wc_eca_shipping_notices' );
-		write_log('ECA Shipping Admin save fired');
+		//write_log('ECA Shipping Admin save fired');
 	}
 
 	//add_action('admin_notices', 'myplugin_admin_messages');
